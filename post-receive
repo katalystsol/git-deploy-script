@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Set up our PATH variable and export it
+PATH="/[path_to_bin]/bin":$PATH
+export PATH
+
+# App directories
+APP_WEB_DIR="/[path_to_deployment_site]"
+APP_GIT_DIR="/[path_to_git_repo]/[repo_name].git"
+BRANCH="master"
+
+# Checkout the last commit inside the web app directory
+while read oldrev newrev ref
+do
+        if [[ $ref =~ .*/$BRANCH$ ]];
+        then
+                echo "Master ref received. Deploying master branch to production..."
+                git --work-tree=${APP_WEB_DIR} --git-dir=${APP_GIT_DIR} checkout -f
+
+# Clean the app directory
+# Use -e "[pattern]" to exclude some file or directory to be cleaned,
+# as they are in the .gitignore file
+# git --work-tree=${APP_WEB_DIR} clean -fd
+
+# Run composer
+cd ${APP_WEB_DIR}
+composer install
+
+# Ensure that storage's folder have write permission for the group
+chmod -R g+w storage
+
+# Optimizations
+echo "Running optimizations"
+php artisan config:clear
+php artisan route:cache
+
+echo "Running migrations"
+php artisan migrate --force
+
+        else
+                echo "Ref $ref successfully received. Doing nothing: only the master branch may be deployed on this server."
+
+        fi
+done
